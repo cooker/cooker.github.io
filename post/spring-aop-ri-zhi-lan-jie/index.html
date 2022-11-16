@@ -1,0 +1,423 @@
+<html>
+<head>
+    <meta charset="utf-8"/>
+<meta name="description" content=""/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>Spring AOP 日志拦截 | Grant 知识库</title>
+
+<link rel="shortcut icon" href="https://cooker.github.io/favicon.ico?v=1668564630010">
+
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cooker.github.io/styles/main.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/css/bootstrap.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets/highlight.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dockerfile.min.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.15.10/languages/dart.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/moment@2.27.0/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.min.js"></script>
+<!-- DEMO JS -->
+<!--<script src="media/scripts/index.js"></script>-->
+
+
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.css">
+</head>
+<body>
+<div class="main gt-bg-theme-color-first">
+    <nav class="navbar navbar-expand-lg">
+    <div class="navbar-brand">
+        <img class="user-avatar" src="/images/avatar.png" alt="头像">
+        <div class="site-name gt-c-content-color-first">
+            Grant 知识库
+        </div>
+    </div>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <i class="fas fa-bars gt-c-content-color-first" style="font-size: 18px"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <div class="navbar-nav mr-auto" style="text-align: center">
+            
+                <div class="nav-item">
+                    
+                        <a href="/" class="menu gt-a-link">
+                            首页
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/archives" class="menu gt-a-link">
+                            归档
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/tags" class="menu gt-a-link">
+                            标签
+                        </a>
+                    
+                </div>
+            
+                <div class="nav-item">
+                    
+                        <a href="/post/about" class="menu gt-a-link">
+                            关于
+                        </a>
+                    
+                </div>
+            
+        </div>
+        <div style="text-align: center">
+            <form id="gridea-search-form" style="position: relative" data-update="1668564630010" action="/search/index.html">
+                <input class="search-input" autocomplete="off" spellcheck="false" name="q" placeholder="搜索文章" />
+                <i class="fas fa-search gt-c-content-color-first" style="position: absolute; top: 9px; left: 10px;"></i>
+            </form>
+        </div>
+    </div>
+</nav>
+
+    <div class="post-container">
+        <div class="post-detail gt-bg-theme-color-second">
+            <article class="gt-post-content">
+                <h2 class="post-title">
+                    Spring AOP 日志拦截
+                </h2>
+                <div class="post-info">
+                    <time class="post-time gt-c-content-color-first">
+                        · 2022-02-25 ·
+                    </time>
+                    
+                        <a href="https://cooker.github.io/tag/uWFcoyXer/" class="post-tags">
+                            # Spring
+                        </a>
+                    
+                </div>
+                <div class="post-content">
+                    <blockquote>
+<p>注解</p>
+</blockquote>
+<pre><code class="language-java">@Inherited
+@Documented
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ShowEvent {
+    String value() default &quot;&quot;;
+    //环境，默认全部环境打日志
+    String[] profile() default &quot;&quot;;
+}
+</code></pre>
+<blockquote>
+<p>实现</p>
+</blockquote>
+<pre><code class="language-java">import cn.hutool.core.lang.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.collect.Maps;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.validation.ConstraintViolation;
+import javax.validation.Validator;
+import javax.validation.executable.ExecutableValidator;
+import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Order(1)
+@Slf4j
+@Component
+@Aspect
+public class LogsAspect {
+    private static String ING_HEADERS[] = new String[]{
+            &quot;accept&quot;, &quot;accept-encoding&quot;, &quot;accept-language&quot;, &quot;connection&quot;, &quot;content-length&quot;, &quot;cookie&quot;,
+            &quot;host&quot;, &quot;token&quot;
+    };
+
+    @Value(&quot;${spring.profiles.active}&quot;)
+    private String env;
+
+    @Resource
+    private Validator validator;
+
+    @Pointcut(&quot;@annotation(com.x2era.xcloud.order.base.ShowEvent) &quot;)
+    public void cutReq() {
+
+    }
+
+    @Around(&quot;cutReq()&quot;)
+    public Object globalLog(ProceedingJoinPoint joinPoint) throws Throwable {
+        Class&lt;?&gt; clazz = joinPoint.getTarget().getClass();
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        Method method = signature.getMethod();
+        Method realMethod = clazz.getMethod(signature.getName(), method.getParameterTypes());
+        ShowEvent showEvent = method.getAnnotation(ShowEvent.class);
+        boolean canLog = Arrays.stream(showEvent.profile()).anyMatch(pf-&gt;&quot;&quot;.equals(pf) || StringUtils.equalsAnyIgnoreCase(pf, env));
+//        Class&lt;?&gt; returnType = realMethod.getReturnType();
+        Object[] args = joinPoint.getArgs();
+        String uuid = UUID.fastUUID().toString(true);
+
+        //校验参数
+        if (canLog) {
+            Pair&lt;Boolean, String&gt; validateArgs = argsValidate(joinPoint.getTarget(), realMethod, args);
+            if (!validateArgs.getLeft()) {
+                log.error(&quot; {} 全局日志 {}&quot;, uuid, JsonUtil.toJson(LogData.builder()
+                        .title(String.format(&quot;%s validateError, %s.%s&quot;, showEvent.value(), clazz.getSimpleName(), realMethod.getName()))
+                        .request(getArgs(args))
+                        .response(validateArgs.getRight())
+                        .build()));
+//                log.error(&quot;{} {}参数校验不通过&quot;, showEvent.value(), method.getName());
+            }
+        }
+
+        Object result = null;
+        long start = DateUtils.timestamp();
+        try {
+            result = joinPoint.proceed();
+        } catch (IllegalArgumentException e) {
+            log.error(&quot;{} 全局日志 参数错误：{}&quot;, uuid, e.getMessage(), e);
+            return Result.error(ResultCodeEnum.ILLEGAL_PARAM_ERROR.getKey(), ResultCodeEnum.ILLEGAL_PARAM_ERROR.getValue());
+        } catch (Exception e) {
+            log.error(&quot;{} Exception occurred at .&quot;, uuid, e);
+            throw e;
+        } finally {
+            if (canLog) {
+                log.info(&quot;{} 全局日志 {}&quot;, uuid, JsonUtil.toJson(LogData.builder()
+                        .title(String.format(&quot;%s %s.%s&quot;,showEvent.value() ,clazz.getSimpleName(), realMethod.getName()))
+                        .header(getHeaders())
+                        .request(getArgs(args))
+                        .response(result)
+                        .costs(DateUtils.timestamp() - start).build()));
+            }
+        }
+
+        return result;
+    }
+
+    private Map&lt;String, String&gt; getHeaders() {
+        Map&lt;String, String&gt; result = new HashMap&lt;&gt;();
+        RequestAttributes requestAttr = RequestContextHolder.currentRequestAttributes();
+        if (requestAttr instanceof ServletRequestAttributes) {
+            HttpServletRequest request = ((ServletRequestAttributes) requestAttr).getRequest();
+            if (request != null) {
+                Enumeration&lt;String&gt; hk = request.getHeaderNames();
+                while (hk.hasMoreElements()) {
+                    String key = hk.nextElement();
+                    if (!ArrayUtils.contains(ING_HEADERS, key.toLowerCase())) {
+                        result.put(key, request.getHeader(key));
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private Object[] getArgs(Object[] args) {
+        Object[] arguments = new Object[args.length];
+        for (int i = 0; i &lt; args.length; i++) {
+            if (args[i] instanceof ServletRequest ||
+                    args[i] instanceof ServletResponse ||
+                    args[i] instanceof MultipartFile ||
+                    args[i] instanceof BindingResult ) {
+                //ServletRequest不能序列化，从入参里排除，否则报异常：java.lang.IllegalStateException: It is illegal to call this method if the current request is not in asynchronous mode (i.e. isAsyncStarted() returns false)
+                //ServletResponse不能序列化 从入参里排除，否则报异常：java.lang.IllegalStateException: getOutputStream() has already been called for this response
+                continue;
+            }
+            arguments[i] = args[i];
+        }
+        return arguments;
+    }
+
+    private Pair&lt;Boolean, String&gt; argsValidate(Object validateParamService, Method method, Object[] args) {
+        Pair&lt;Boolean, String&gt; validate1 = methodArgsValidate(validateParamService, method, args);
+        if (!validate1.getLeft()) {
+            return validate1;
+        }
+        Pair&lt;Boolean, String&gt; validate2 = methodArgsFieldValidate(args);
+        if (!validate2.getLeft()) {
+            return validate2;
+        }
+        return Pair.of(true, null);
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LogData implements Serializable {
+        private String title;
+        private Map&lt;String, String&gt; header;
+        private Object request;
+        private Object response;
+        private Long costs;
+    }
+
+
+
+    /**
+     * 方法参数校验
+     *
+     * @param validateParamService 拦截的service
+     * @param method               具体拦截的方法
+     * @param args                 方法参数
+     * @return true|false、errorMessage
+     */
+    private Pair&lt;Boolean, String&gt; methodArgsValidate(Object validateParamService, Method method, Object[] args) {
+        if (ArrayUtils.isEmpty(args)) {
+            return Pair.of(true, null);
+        }
+        ExecutableValidator executableValidator = validator.forExecutables();
+        Set&lt;ConstraintViolation&lt;Object&gt;&gt; constraintViolationSet = executableValidator.validateParameters(validateParamService, method, args);
+        if (CollectionUtils.isEmpty(constraintViolationSet)) {
+            return Pair.of(true, null);
+        }
+        List&lt;String&gt; errorMessage = constraintViolationSet.stream()
+                .map(e -&gt; e.getPropertyPath().toString() + e.getMessage())
+                .collect(Collectors.toList());
+        return Pair.of(false, JsonUtil.toJson(errorMessage));
+    }
+
+    /**
+     * 方法参数的属性校验
+     *
+     * @param args args
+     * @return true | false
+     */
+    private Pair&lt;Boolean, String&gt; methodArgsFieldValidate(Object[] args) {
+        if (ArrayUtils.isEmpty(args)) {
+            return Pair.of(true, null);
+        }
+        for (Object arg : args) {
+            if (arg != null) {
+                Set&lt;ConstraintViolation&lt;Object&gt;&gt; error = validator.validate(arg);
+                if (!CollectionUtils.isEmpty(error)) {
+                    List&lt;String&gt; errorMessage = error.stream()
+                            .map(e -&gt; e.getPropertyPath().toString() + e.getMessage())
+                            .collect(Collectors.toList());
+                    return Pair.of(false, JsonUtil.toJson(errorMessage));
+                }
+            }
+        }
+        return Pair.of(true, null);
+    }
+
+}
+</code></pre>
+
+                </div>
+            </article>
+        </div>
+
+        
+            <div class="next-post">
+                <div class="next gt-c-content-color-first">下一篇</div>
+                <a href="https://cooker.github.io/post/spring-aop-cao-gao/" class="post-title gt-a-link">
+                    Spring AOP
+                </a>
+            </div>
+        
+
+        
+            <span id="/post/spring-aop-ri-zhi-lan-jie/" class="leancloud_visitors" data-flag-title="Spring AOP 日志拦截">
+                <em class="post-meta-item-text">阅读量 </em>
+                <i class="leancloud-visitors-count">0</i>
+            </span>
+        
+
+        
+
+        
+            <script src='https://cdn.jsdelivr.net/npm/valine/dist/Valine.min.js'></script>
+
+<style>
+	div#vcomments{
+		width:100%;
+		max-width: 1000px;
+		padding: 2.5%
+	}
+</style>
+
+
+	<div id="vcomments"></div>
+
+<script>
+	new Valine({
+		el: '#vcomments',
+		appId: '7HO17M89VUDD7ME1HwY03bed-gzGzoHsz',
+		appKey: 'x8zjdfJuJA1rCPMtsY1PyqnX',
+		avatar: '',
+		pageSize: 5,
+		recordIp: false,
+		placeholder: 'Just Go Go',
+		visitor: true,
+	});
+</script>
+
+        
+
+        <div class="site-footer gt-c-content-color-first">
+    <div class="slogan gt-c-content-color-first">经验积累</div>
+    <div class="social-container">
+        
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+    </div>
+    <div class="footer-info">
+        Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a>
+    </div>
+    <div>
+        Theme by <a href="https://imhanjie.com/" target="_blank">imhanjie</a>, Powered by <a
+                href="https://github.com/getgridea/gridea" target="_blank">Gridea | <a href="https://cooker.github.io/atom.xml" target="_blank">RSS</a></a>
+    </div>
+</div>
+
+<script>
+  hljs.initHighlightingOnLoad()
+</script>
+
+    </div>
+</div>
+</body>
+</html>
